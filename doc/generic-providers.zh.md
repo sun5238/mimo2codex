@@ -45,6 +45,54 @@ mimo2codex --model generic
 
 也可以用 `MIMO2CODEX_PROVIDERS_FILE=/some/path/providers.json` 显式指定。
 
+编辑器补全和校验可在文件顶层添加可选的 `"$schema"`，指向随 mimo2codex
+发布的本地 `schemas/providers.schema.json`（支持相对 `providers.json` 的路径）。
+`codex-catalog.json` 元数据文件同样可以引用
+`schemas/codex-catalog.schema.json`。这两个 schema 仅供编辑器使用，
+不改变运行时校验；修改配置后需重启网关。管理台保存会保留顶层的 `$schema`
+和 `codexCatalog` 字段。
+
+Codex 经 `model_catalog_url` 拉取完整的 `ModelInfo` 目录（`GET
+/model_catalog`），而非 OpenAI 风格的 `GET /v1/models` 列表。
+`codex-catalog.json` 本身就是含 `models` 数组的 Codex `ModelsResponse`，
+可直接交给 Codex 的 `model_catalog_json`。文件中**每个基础模型 ID 只写
+一条完整 `ModelInfo`**，`slug = display_name = 裸模型名`，同一模型跨 provider
+不重复写。通过 `model_catalog_url` 发布时，网关按已启用 provider 克隆基础
+记录，**只把 slug 和 display_name** 改为 `模型@provider.id`，如
+`qwen3.8-max@anoe` 和 `qwen3.8-max@idealab`。每项都要配置
+`model_messages.instructions_template` 或旧版 `base_instructions`；网关
+不注入其他字段，只有 Codex 解码器允许省略的字段才使用 Codex 自身默认值。
+
+填写同一基础模型在所有 provider 均可使用的安全 `context_window`，供 Codex
+自动压缩。如果 `providers.json` 还配置了供网关 chat 路径压缩使用的
+`contextWindow`，各 provider 都必须与基础记录一致；不同 provider 实际上限
+不同则无法由一条共享记录表达，会明确报错而不是悄悄覆盖。新增提供同一模型
+的 provider 不需要复制目录记录；新增基础模型才需要。`@provider.id` 显式
+点名上游，不自动换道；裸名仍可路由，也可供静态文件使用，但不列入远端目录。
+OpenAI 风格 `/v1/models` 是独立列表。
+
+默认目录文件不存在时普通代理流量仍可用，`/model_catalog` 则返回 503，
+不会在缺少必填元数据时生成伪目录。显式指定的文件不存在、JSON 损坏、
+必填项缺失或模型清单不匹配都会使网关启动失败。JSON Schema 标明必填项
+和 Codex 自带的可选字段默认值，不会自动插入 JSON Schema 的 `default`。
+使用 `model_catalog_json` 指向本文件时，应从该 profile 移除
+`model_catalog_url`（静态目录优先于动态发现）。
+
+升级 Codex 时，在 Git fork checkout 内用目标版本自己的解码器验证，
+而非猜测 `ModelInfo` 是否变化：
+
+```bash
+CODEX_REPO=/path/to/codex npm run schema:codex-catalog
+CODEX_REPO=/path/to/codex npm run verify:codex-catalog
+```
+
+第一条命令用目标 Codex checkout 的 Rust `ModelsResponse` / `ModelInfo`
+`JsonSchema` 派生结果重新生成**完整 schema**；网关仅额外补上 Codex 自定义
+反序列化器的指令模板规则、serde shell 别名和非负窗口约束。第二条先构建 fork、核对 provider
+清单，再用目标 Codex 解码器分别验证裸名文件和展开后的远端目录。
+`src/codex/modelCatalog.ts` 内的运行时必填项校验须与目标解码器对齐；
+需事先缓存 Cargo 依赖。
+
 完整示例：
 
 ```json

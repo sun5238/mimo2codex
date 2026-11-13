@@ -31,14 +31,37 @@ export class UpstreamError extends Error {
   status: number;
   bodySnippet?: string;
   code: string;
+  // Seconds the upstream asked us to wait (Retry-After header, numeric or
+  // HTTP-date). P3: the gateway itself no longer retries, but relays this to
+  // codex so ITS retry ladder can pace off the upstream's clock.
+  retryAfterSec?: number;
 
-  constructor(opts: { status: number; message: string; code: string; bodySnippet?: string }) {
+  constructor(opts: {
+    status: number;
+    message: string;
+    code: string;
+    bodySnippet?: string;
+    retryAfterSec?: number;
+  }) {
     super(opts.message);
     this.name = "UpstreamError";
     this.status = opts.status;
     this.code = opts.code;
     this.bodySnippet = opts.bodySnippet;
+    this.retryAfterSec = opts.retryAfterSec;
   }
+}
+
+// Parse a Retry-After header (seconds or HTTP-date) into plain seconds.
+// Returns null when absent or unparseable.
+export function parseRetryAfterSec(res: Response): number | null {
+  const raw = res.headers.get("retry-after");
+  if (!raw) return null;
+  const secs = Number(raw);
+  if (Number.isFinite(secs) && secs >= 0) return Math.min(Math.ceil(secs), 240);
+  const when = Date.parse(raw);
+  if (!Number.isNaN(when)) return Math.max(0, Math.min(240, Math.ceil((when - Date.now()) / 1000)));
+  return null;
 }
 
 function buildUrl(baseUrl: string, path: string): string {
@@ -308,6 +331,7 @@ async function postUpstream(
       code,
       message,
       bodySnippet: snippet,
+      retryAfterSec: parseRetryAfterSec(res) ?? undefined,
     });
   }
 }

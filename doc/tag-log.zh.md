@@ -19,6 +19,20 @@ mimo2codex 的版本发布历史，按 tag 倒序排列。
 
 ## v0.5.29 (upcoming)
 
+- **[opt]** **Codex 目录编辑器 schema 从 Codex 源码生成** —— `npm run schema:codex-catalog -- /path/to/codex` 从目标 checkout 的 `schemars` 派生结果导出完整的 `ModelsResponse`/`ModelInfo` schema，并少量补充指令模板约束、serde shell 别名及非负上下文窗口。不再手工维护不完整的字段清单；Codex 升级后同时运行原生解码校验。
+
+- **[opt]** **Codex 原生目录以裸名存储、远端按 provider 展开** —— `codex-catalog.json` 是完整的 `ModelsResponse`，每个基础模型只写一条 `slug = display_name = 裸名`，可直接作为 Codex 的 `model_catalog_json`。通过 `model_catalog_url` 发布时，网关按已启用 provider 克隆模型，**仅修改 slug/display_name** 为 `模型@provider.id`，其余元数据原样保留。必填 `ModelInfo` 项、窗口、推理档位和指令都在文件中配置，不由网关注入默认值。缺字段或基础模型记录则启动失败；默认文件缺失不影响普通转发，目录端点返回 503。新增提供同一基础模型的 provider 不需复制目录记录；升级验证分别解码静态和动态目录。
+
+- **[opt]** **模型别名只用 provider ID 作后缀** —— `providers.json` 不再单独配置 `lane`；派生别名和 Codex 目录 slug 统一为 `模型@provider.id`。如 `anoe` 接 ducky 时显示 `glm-5.3@anoe`，稳定的 provider id 不变。旧的 `@ducky` 模型选择需改成 `@anoe`；裸名路由和按 provider id 熔断的键保持不变。
+
+- **[opt]** **远端目录名称统一为可复制的 `模型@provider.id`** —— 静态文件记录使用裸名；网关远端响应里的所有模型（含单泳道模型）都以同一个可路由别名作为 `slug` 和 `display_name`。裸名仍可路由但不列入远端目录；显式别名锁定 provider。
+
+- **[fix]** **Codex 目录 schema 明确必填项与 Codex 默认值** —— 编辑器校验对齐 Codex 的 `ModelsResponse` 结构，支持 `audio` 模态、`ultra` 等非空自定义 reasoning 档位及空的档位列表。网关不再提供元数据默认值。
+
+- **[fix]** **Codex 目录配置缺失必填项时启动即报错** —— `models[]` 结构损坏、必填 `ModelInfo` 字段缺失、slug 重复或与已启用 provider 模型清单不匹配时，错误指出文件、模型和字段；显式目录路径必须存在。升级 Codex 时可运行 `CODEX_REPO=/path/to/codex npm run verify:codex-catalog`，用目标版本真实的 Rust `ModelsResponse` 解码器离线验证原文件。
+
+- **[fix]** **配置 JSON Schema 在管理台保存后仍有效** —— `schemas/providers.schema.json` 与 `schemas/codex-catalog.schema.json` 随 npm 包发布，可从对应 JSON 文件引用以获得编辑器校验。管理台保存现保留顶层 `$schema` 与 `codexCatalog`，避免静默重置目录文件路径；schema 说明对齐实际泳道覆盖顺序和 provider ID 校验，模型的 `note` / `paygOnly` 也不再在读取时丢失，并增加回归测试。
+
 - **[opt]** **MiMo v2 模型下线 → 透明别名映射到 v2.5（无需改配置）** —— MiMo 已于 2026-06-30 下线 v2 代模型（`mimo-v2-pro`、`mimo-v2-omni`、`mimo-v2-flash`），继续用旧名请求上游会 400。mimo2codex 现在把**退役旧名别名映射到官方替代模型**，老的 `config.toml` 不改也能用、且仍命中正确模型：`mimo-v2-pro` → `mimo-v2.5-pro`，`mimo-v2-omni` / `mimo-v2-flash` → `mimo-v2.5`。实现方式是 `ProviderModel.aliases` + 支持别名的 `resolveModel`（照搬 DeepSeek）；别名属于「干净解析」——上游拿到的是在线模型 id，不产生兜底改写/告警。三个退役条目从内置目录移除，因此模型列表、生成的 config.toml 片段、管理台「模型」页只保留在线的 v2.5 模型（`mimo-v2.5-pro`、`mimo-v2.5-pro-ultraspeed`、`mimo-v2.5`）；旧的 DB 行会在下次启动时由 `seedBuiltins` 自动清理。**旧 `mimo-v2-flash` 用户注意行为变化：** 其替代模型 `mimo-v2.5` 思考模式**默认开启**（flash 原本默认关闭），且**支持视觉**。mimoskill 辅助脚本（`ocr.py` / `mimo_chat.py`，它们直连 MiMo、没有别名层）也会把退役旧名强制切到 v2.5 替代模型。
 
 - **[fix]** **思考模式采样参数：现在也剥离 `top_p`（此前只剥 `temperature`）** —— 按 MiMo 文档，v2.5 系列在思考模式下会忽略自定义 `temperature` **和** `top_p`（上游强制 `temperature:1.0` / `top_p:0.95`）。`normalizeMimoBody` 此前只删 `temperature`，现在对 v2.5 推理模型（`mimo-v2.5-pro`、`mimo-v2.5`、`mimo-v2.5-pro-ultraspeed`）两者都删，让请求与上游最终行为一致。归一化现在在 Responses 和 Chat 两个调用点都以**上游**模型 id（别名解析后）为准——此前 Chat 路径用的是客户端原始名（`out.model`），会把规则错误地套到被别名映射的旧名上。

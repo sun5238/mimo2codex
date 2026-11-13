@@ -45,6 +45,64 @@ Write a `providers.json` with one entry per upstream. Default path:
 
 Override with `MIMO2CODEX_PROVIDERS_FILE=/some/path/providers.json`.
 
+For editor completion and validation, add an optional top-level `"$schema"`
+pointing to the local `schemas/providers.schema.json` shipped with mimo2codex
+(a path relative to `providers.json` works). The separate
+`codex-catalog.json` metadata file can reference `schemas/codex-catalog.schema.json`
+in the same way. Neither schema changes runtime validation; restart the gateway
+after editing either file. Admin saves retain the root-level `$schema` and
+`codexCatalog` settings.
+
+Codex reads the full `ModelInfo` catalog from `model_catalog_url` (`GET
+/model_catalog`), not the OpenAI-style `GET /v1/models` list.
+`codex-catalog.json` is a Codex `ModelsResponse` with a `models` array, so it
+can be selected directly with Codex's `model_catalog_json`. Store **one full
+`ModelInfo` per bare model id**, with `slug = display_name = model-id`, even
+when multiple providers declare that model. For `model_catalog_url`, the
+gateway clones each base record per enabled provider and changes only `slug`
+and `display_name` to `model@provider-id` (e.g. `qwen3.8-max@anoe` and
+`qwen3.8-max@idealab`). It does not supply any missing ModelInfo fields.
+Include `model_messages.instructions_template` (or legacy
+`base_instructions`) in every record; Codex supplies defaults only for fields
+that are optional in its decoder.
+
+Set `context_window` to the safe window shared by every provider declaring
+that base id; Codex uses it for compaction. If `providers.json` also declares
+the model's `contextWindow` (used by the gateway's chat-side compaction), it
+must match the base record on every provider. Differing provider limits cannot
+be represented by one shared record and are rejected rather than silently
+overridden. Adding another provider for an existing model needs no new
+catalog record; adding a new base model does. `@provider-id` explicitly selects
+one upstream and does not fail over. Bare ids remain routable (and can be
+selected with the static file), but are not listed in the remote catalog.
+`/v1/models` remains a separate OpenAI-style list.
+
+If the default catalog file does not exist, normal proxy traffic still works
+but `/model_catalog` returns 503: no catalog can be generated without the
+required metadata. An explicitly configured missing file, malformed JSON,
+missing required field, or inventory mismatch fails gateway startup. The JSON
+Schema describes the required fields and Codex-owned optional defaults; it
+does not insert JSON Schema `default` values at runtime. When pointing Codex
+at this file via `model_catalog_json`, remove `model_catalog_url` from that
+profile (a static catalog takes priority over remote discovery).
+
+When upgrading Codex, run this from a Git fork checkout to verify against its
+actual decoder instead of assuming its `ModelInfo` contract has not changed:
+
+```bash
+CODEX_REPO=/path/to/codex npm run schema:codex-catalog
+CODEX_REPO=/path/to/codex npm run verify:codex-catalog
+```
+
+The first command regenerates the **complete JSON Schema** using that Codex
+checkout's Rust `ModelsResponse`/`ModelInfo` `JsonSchema` derivations. Small
+gateway annotations add Codex's custom instruction-template check, serde
+shell aliases and nonnegative context-window bounds. The second builds the fork, checks the catalog against declared
+generic providers, and asks the target Codex decoder to parse both the bare
+static file and expanded response. Keep the runtime required-field checks in
+`src/codex/modelCatalog.ts` aligned with that decoder. Cargo dependencies must
+be cached locally.
+
 Full example:
 
 ```json

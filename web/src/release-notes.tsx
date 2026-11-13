@@ -64,6 +64,66 @@ export const RELEASE_NOTES: ReleaseNote[] = [
       {
         kind: "improved",
         title: {
+          en: "One catalog file for Codex and the gateway",
+          zh: "Codex 与网关共用一份模型目录",
+        },
+        description: {
+          en: "codex-catalog.json stores complete bare-name models usable as model_catalog_json. The gateway only adds provider suffixes to slug and display name for remote discovery.",
+          zh: "codex-catalog.json 用完整裸名模型供 model_catalog_json 直接读取；网关只在远端目录中给 slug 和展示名加上 provider 后缀。",
+        },
+        location: { en: "codex-catalog.json", zh: "codex-catalog.json" },
+      },
+      {
+        kind: "improved",
+        title: {
+          en: "Copy model names directly into Codex config",
+          zh: "目录模型名可直接写入 Codex 配置",
+        },
+        description: {
+          en: "Every remote catalog entry uses model@provider-id for both slug and display name, including models with just one upstream.",
+          zh: "远端目录中的每条模型记录（含单泳道模型）都以 模型@provider.id 同时作为 slug 和展示名。",
+        },
+        location: { en: "Codex model catalog", zh: "Codex 模型目录" },
+      },
+      {
+        kind: "fixed",
+        title: {
+          en: "Catalog schema identifies required fields",
+          zh: "目录 schema 标明必填字段",
+        },
+        description: {
+          en: "The complete editor schema is generated from Codex's Rust ModelInfo type, including required fields and optional metadata.",
+          zh: "完整编辑器 schema 由 Codex Rust ModelInfo 类型生成，覆盖必填项及可选元数据。",
+        },
+        location: { en: "codex-catalog.json", zh: "codex-catalog.json" },
+      },
+      {
+        kind: "fixed",
+        title: {
+          en: "Invalid Codex catalogs fail early",
+          zh: "Codex 目录配置错误在启动时提示",
+        },
+        description: {
+          en: "Missing required model metadata or entries not matching enabled providers now show clear startup errors.",
+          zh: "缺少必填模型元数据或目录与已启用 provider 清单不符时，启动即明确报错。",
+        },
+        location: { en: "codex-catalog.json", zh: "codex-catalog.json" },
+      },
+      {
+        kind: "fixed",
+        title: {
+          en: "JSON Schema references survive provider edits",
+          zh: "编辑提供方后仍保留 JSON Schema 引用",
+        },
+        description: {
+          en: "The provider editor keeps the schema reference and custom codex catalog path when saving. Both config schemas now ship with the package; model notes and pay-as-you-go flags are preserved on load.",
+          zh: "管理台保存时保留 schema 引用和自定义 Codex 目录路径，两份配置 schema 随包发布，模型备注和按量付费标记在读取时也不再丢失。",
+        },
+        location: { en: "providers.json / codex-catalog.json", zh: "providers.json / codex-catalog.json" },
+      },
+      {
+        kind: "improved",
+        title: {
           en: "Retired MiMo v2 names transparently upgrade to v2.5",
           zh: "退役的 MiMo v2 模型名透明升级到 v2.5",
         },

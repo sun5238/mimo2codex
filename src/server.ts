@@ -1,7 +1,11 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { Config } from "./config.js";
 import { respToResponses } from "./translate/respToResponses.js";
-import { pipeChatStreamToResponses, type StreamPipelineResult } from "./translate/streamToSse.js";
+import {
+  chatResponseToChunkStream,
+  pipeChatStreamToResponses,
+  type StreamPipelineResult,
+} from "./translate/streamToSse.js";
 import { iterChatStreamChunks } from "./upstream/chatStream.js";
 import { maybeCompactChat, type ChatCaller } from "./translate/autoCompact.js";
 import {
@@ -26,6 +30,48 @@ import { backfillStatsChunk, isStatsBackfillDone } from "./db/stats.js";
 import { applyLogBodyMode, resolveLogBodyMode, runLogMaintenance } from "./logging/settings.js";
 import { redactSensitive } from "./util/redact.js";
 import { isMaintenance, getMaintenanceMessage } from "./util/maintenance.js";
+import {
+  getCodexModelCatalog,
+  resolveCodexCatalogPath,
+} from "./codex/modelCatalog.js";
+import {
+  firstOpenLane,
+  injectedRetryAfterSec,
+  recordLane429,
+  recordLaneSuccess,
+  type RouteCandidate,
+} from "./upstream/throttle.js";
+
+// ── P3: (lane, model) tracking ────────────────────────────────────────────
+// Wrap every upstream call so the breaker sees 429s (record) and successes
+// (reset/close). Only 429s count — mid-stream breaks and other statuses are
+// invisible to the breaker by design.
+async function trackLane<T>(
+  provider: Provider,
+  upstreamModel: string,
+  fn: () => Promise<T>
+): Promise<T> {
+  try {
+    const out = await fn();
+    recordLaneSuccess(provider.id, upstreamModel);
+    return out;
+  } catch (err) {
+    if (err instanceof UpstreamError && err.status === 429) {
+      recordLane429(provider.id, upstreamModel);
+    }
+    throw err;
+  }
+}
+
+// Relay an upstream failure to the client as a REAL HTTP status (headers not
+// yet flushed). This is what lets codex classify: 429 → retry-ladder paced by
+// the injected/relayed Retry-After; 4xx like 402/400 → terminal, no wasted
+// Reconnecting storm (issue seen in P0 with the 402 five-shot blind retry).
+function sendUpstreamErrorJson(res: ServerResponse, err: UpstreamError): void {
+  const ra = injectedRetryAfterSec(err);
+  if (ra !== null) res.setHeader("Retry-After", String(ra));
+  sendJson(res, err.status, errorEnvelope(err.status, err.code, err.message));
+}
 
 // Wraps getActiveOverride() so the per-request DB lookup is safe when:
 //   - admin is disabled (no DB open → getDb() would throw),
@@ -392,27 +438,37 @@ export function selectProvider(
   // Generics take priority over built-ins so that an internal MiMo/DeepSeek
   // proxy declared as a generic can serve the same model names (e.g.
   // `mimo-v2.5-pro`) without the built-in intercepting.
+  //
+  // P3: collect ALL matching candidates first, then pick the first one whose
+  // (lane, model) breaker is not OPEN — consecutive 429s fail traffic over to
+  // the mutual-backup lane (same base model on another provider). When every
+  // candidate is blocked we still route the primary so the client receives the
+  // upstream's real 429 (zero synthesized errors, codex paces itself off the
+  // relayed Retry-After).
+  const pass1: SelectedProvider[] = [];
   for (const p of PROVIDER_LIST) {
     if (BUILTIN_IDS.has(p.id)) continue;
     const isOpenCatalog = !p.builtinModels || p.builtinModels.length === 0;
     if (isOpenCatalog) continue;
-    if (!p.resolveModel(clientModel)) continue;
+    const resolved = p.resolveModel(clientModel);
+    if (!resolved) continue;
     const runtime = cfg.providers[p.id];
     if (!runtime) continue;
-    const resolved = p.resolveModel(clientModel);
-    return {
+    pass1.push({
       provider: p,
       runtime,
-      upstreamModel: resolved?.id ?? p.defaultModel,
-      modelInfo: resolved ?? p.resolveModel(p.defaultModel),
-      rewriteNotice: resolved
-        ? null
-        : {
-            from: clientModel,
-            to: p.defaultModel,
-            reason: "matched provider catalog but unknown model id → using provider's defaultModel",
-          },
-    };
+      upstreamModel: resolved.id,
+      modelInfo: resolved,
+      rewriteNotice: null,
+    });
+  }
+  if (pass1.length > 0) {
+    const candidates: RouteCandidate<SelectedProvider>[] = pass1.map((sp) => ({
+      lane: sp,
+      providerId: sp.provider.id,
+      modelId: sp.upstreamModel,
+    }));
+    return firstOpenLane(candidates) ?? pass1[0];
   }
 
   // Pass 2: built-in providers (mimo, deepseek) — only reached when no
@@ -835,19 +891,21 @@ async function handleResponses(
   if (!stream) {
     try {
       await runAutoCompact();
-      const upstreamRes = await callOpenAICompat(
-        {
-          baseUrl: runtime.baseUrl,
-          apiKey: runtime.apiKey,
-          userAgent: cfg.userAgent,
-          enhanceError: provider.enhanceError.bind(provider),
-          contextOverflowMode: cfg.contextOverflowMode,
-          modelInfo: modelInfo
-            ? { id: modelInfo.id, contextWindow: modelInfo.contextWindow }
-            : { id: upstreamModel },
-        },
-        chat,
-        ac.signal
+      const upstreamRes = await trackLane(provider, upstreamModel, () =>
+        callOpenAICompat(
+          {
+            baseUrl: runtime.baseUrl,
+            apiKey: runtime.apiKey,
+            userAgent: cfg.userAgent,
+            enhanceError: provider.enhanceError.bind(provider),
+            contextOverflowMode: cfg.contextOverflowMode,
+            modelInfo: modelInfo
+              ? { id: modelInfo.id, contextWindow: modelInfo.contextWindow }
+              : { id: upstreamModel },
+          },
+          chat,
+          ac.signal
+        )
       );
       const chatJson = (await upstreamRes.json()) as ChatResponse;
       const responses = respToResponses(chatJson, payload, {
@@ -872,7 +930,7 @@ async function handleResponses(
       return;
     } catch (err) {
       if (err instanceof UpstreamError) {
-        sendJson(res, err.status, errorEnvelope(err.status, err.code, err.message));
+        sendUpstreamErrorJson(res, err);
         recordLog(cfg, {
           ...baseEntry,
           status_code: err.status,
@@ -925,24 +983,112 @@ async function handleResponses(
   const keepalive = setInterval(() => sink.comment("keepalive"), KEEPALIVE_INTERVAL_MS);
   res.on("close", () => clearInterval(keepalive));
 
+  // features.nonStreamingUpstream: the upstream is asked for a single complete
+  // JSON (stream:false — stream-intolerant backends break under SSE). The finished
+  // ChatResponse is re-expressed as a one-chunk stream and run through the
+  // normal pipeChatStreamToResponses machinery, so codex still receives the
+  // full event choreography (per-item output_item.added/done — it does NOT
+  // harvest items from response.completed). Cost: no token-by-token output.
+  if (provider.responseFlags?.nonStreamingUpstream) {
+    chat.stream = false;
+    let pipeResult: StreamPipelineResult | undefined;
+    let streamError: Error | null = null;
+    try {
+      await runAutoCompact();
+      const bufferedRes = await trackLane(provider, upstreamModel, () =>
+        callOpenAICompat(
+          {
+            baseUrl: runtime.baseUrl,
+            apiKey: runtime.apiKey,
+            userAgent: cfg.userAgent,
+            enhanceError: provider.enhanceError.bind(provider),
+            contextOverflowMode: cfg.contextOverflowMode,
+            modelInfo: modelInfo
+              ? { id: modelInfo.id, contextWindow: modelInfo.contextWindow }
+              : { id: upstreamModel },
+          },
+          chat,
+          ac.signal
+        )
+      );
+      const chatJson = (await bufferedRes.json()) as ChatResponse;
+      pipeResult = await pipeChatStreamToResponses(
+        sink,
+        { chunks: chatResponseToChunkStream(chatJson) },
+        payload,
+        {
+          exposeReasoning: cfg.exposeReasoning,
+          extractInlineThink: !!provider.responseFlags?.extractInlineThink,
+          namespaceMap,
+        }
+      );
+      recordLog(cfg, {
+        ...baseEntry,
+        request_id: chatJson.id ?? null,
+        status_code: 200,
+        duration_ms: Date.now() - startedAt,
+        ...usageFromChatResponse(chatJson.usage),
+        ...rewriteLogFields,
+        response_body: bodyForLog(pipeResult?.response),
+        tool_call_count: pipeResult?.toolCallCount ?? countToolCallsInChatResponse(chatJson),
+      });
+    } catch (err) {
+      streamError = err as Error;
+      const isUpstream = err instanceof UpstreamError;
+      const status = isUpstream ? (err as UpstreamError).status : 500;
+      const code = isUpstream ? (err as UpstreamError).code : "internal_error";
+      if (!isUpstream) {
+        log.error("non-streaming-upstream request failed", { error: streamError.message });
+      }
+      if (isUpstream && !res.headersSent) {
+        sendUpstreamErrorJson(res, err as UpstreamError);
+      } else if (!sink.closed()) {
+        sink.write("error", {
+          type: "error",
+          code,
+          message: streamError.message,
+          sequence_number: 9999,
+        });
+        sink.end();
+      }
+      recordLog(cfg, {
+        ...baseEntry,
+        status_code: status,
+        duration_ms: Date.now() - startedAt,
+        prompt_tokens: null,
+        completion_tokens: null,
+        total_tokens: null,
+        error_code: code,
+        error_snippet: (err as UpstreamError).bodySnippet ?? streamError.message,
+        response_body: null,
+        tool_call_count: null,
+      });
+    } finally {
+      clearInterval(keepalive);
+    }
+    return;
+  }
+
   let upstreamRes: Response;
   try {
     // Runs with the keepalive already active, so the summary round-trip doesn't
     // re-introduce the silent-socket disconnect we just fixed.
     await runAutoCompact();
-    upstreamRes = await callOpenAICompat(
-      {
-        baseUrl: runtime.baseUrl,
-        apiKey: runtime.apiKey,
-        userAgent: cfg.userAgent,
-        enhanceError: provider.enhanceError.bind(provider),
-        contextOverflowMode: cfg.contextOverflowMode,
-        modelInfo: modelInfo
-          ? { id: modelInfo.id, contextWindow: modelInfo.contextWindow }
-          : { id: upstreamModel },
-      },
-      chat,
-      ac.signal
+    upstreamRes = await trackLane(provider, upstreamModel, () =>
+      callOpenAICompat(
+        {
+          baseUrl: runtime.baseUrl,
+          apiKey: runtime.apiKey,
+          userAgent: cfg.userAgent,
+          enhanceError: provider.enhanceError.bind(provider),
+          contextOverflowMode: cfg.contextOverflowMode,
+          modelInfo: modelInfo
+            ? { id: modelInfo.id, contextWindow: modelInfo.contextWindow }
+            : { id: upstreamModel },
+        },
+        chat,
+        ac.signal
+      )
     );
   } catch (err) {
     clearInterval(keepalive);
@@ -953,8 +1099,12 @@ async function handleResponses(
     if (!isUpstream) {
       log.error("stream request failed (pre-stream)", { error: message });
     }
-    // Headers already flushed → deliver the error over SSE, not as JSON.
-    if (!sink.closed()) {
+    // P3: headers not yet flushed (the keepalive hasn't ticked) → relay the
+    // REAL upstream status + Retry-After so codex can classify; only fall back
+    // to the SSE error event once 200 is already on the wire.
+    if (isUpstream && !res.headersSent) {
+      sendUpstreamErrorJson(res, err as UpstreamError);
+    } else if (!sink.closed()) {
       sink.write("error", { type: "error", code, message, sequence_number: 9999 });
       sink.end();
     }
@@ -1077,19 +1227,21 @@ async function handleResponsesPassthrough(
   // Non-streaming path: parse upstream JSON and forward verbatim.
   if (!stream) {
     try {
-      const upstreamRes = await callResponsesPassthrough(
-        {
-          baseUrl: runtime.baseUrl,
-          apiKey: runtime.apiKey,
-          userAgent: cfg.userAgent,
-          enhanceError: provider.enhanceError.bind(provider),
-          contextOverflowMode: cfg.contextOverflowMode,
-          modelInfo: modelInfo
-            ? { id: modelInfo.id, contextWindow: modelInfo.contextWindow }
-            : { id: upstreamModel },
-        },
-        forwardBody,
-        ac.signal
+      const upstreamRes = await trackLane(provider, upstreamModel, () =>
+        callResponsesPassthrough(
+          {
+            baseUrl: runtime.baseUrl,
+            apiKey: runtime.apiKey,
+            userAgent: cfg.userAgent,
+            enhanceError: provider.enhanceError.bind(provider),
+            contextOverflowMode: cfg.contextOverflowMode,
+            modelInfo: modelInfo
+              ? { id: modelInfo.id, contextWindow: modelInfo.contextWindow }
+              : { id: upstreamModel },
+          },
+          forwardBody,
+          ac.signal
+        )
       );
       const json = (await upstreamRes.json()) as Record<string, unknown>;
       sendJson(res, 200, json);
@@ -1113,7 +1265,7 @@ async function handleResponsesPassthrough(
       return;
     } catch (err) {
       if (err instanceof UpstreamError) {
-        sendJson(res, err.status, errorEnvelope(err.status, err.code, err.message));
+        sendUpstreamErrorJson(res, err);
         recordLog(cfg, {
           ...baseEntry,
           status_code: err.status,
@@ -1147,50 +1299,43 @@ async function handleResponsesPassthrough(
   }
 
   // Streaming path: pipe upstream SSE bytes directly to the client.
-  // Same rationale as the translated path — flush 200 + SSE headers and start
-  // the keepalive BEFORE awaiting the upstream so a long prefill (large
-  // context / big image) doesn't leave Codex on a silent socket (issue #65).
-  // Pre-stream errors are therefore emitted as an SSE `error` event.
-  res.statusCode = 200;
-  res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
-  res.setHeader("Cache-Control", "no-cache, no-transform");
-  res.setHeader("Connection", "keep-alive");
-  if (typeof (res as unknown as { flushHeaders?: () => void }).flushHeaders === "function") {
-    (res as unknown as { flushHeaders: () => void }).flushHeaders();
-  }
-  const keepalive = setInterval(() => {
-    if (!res.writableEnded) res.write(": keepalive\n\n");
-  }, KEEPALIVE_INTERVAL_MS);
-  res.on("close", () => clearInterval(keepalive));
-
+  //
+  // P3 (2026-11-13): fetch the upstream FIRST and flush the 200+SSE headers
+  // only once it answered. A pre-header failure (429 included) is then relayed
+  // as its REAL HTTP status + Retry-After so codex can classify and pace —
+  // this deliberately un-does the eager 200 flush of issue #65: a request the
+  // upstream rejects never produces headers anyway, and rejected-request
+  // latencies are single-digit seconds, far inside codex's idle window.
   let upstreamRes: Response;
   try {
-    upstreamRes = await callResponsesPassthrough(
-      {
-        baseUrl: runtime.baseUrl,
-        apiKey: runtime.apiKey,
-        userAgent: cfg.userAgent,
-        enhanceError: provider.enhanceError.bind(provider),
-        contextOverflowMode: cfg.contextOverflowMode,
-        modelInfo: modelInfo
-          ? { id: modelInfo.id, contextWindow: modelInfo.contextWindow }
-          : { id: upstreamModel },
-      },
-      forwardBody,
-      ac.signal
+    upstreamRes = await trackLane(provider, upstreamModel, () =>
+      callResponsesPassthrough(
+        {
+          baseUrl: runtime.baseUrl,
+          apiKey: runtime.apiKey,
+          userAgent: cfg.userAgent,
+          enhanceError: provider.enhanceError.bind(provider),
+          contextOverflowMode: cfg.contextOverflowMode,
+          modelInfo: modelInfo
+            ? { id: modelInfo.id, contextWindow: modelInfo.contextWindow }
+            : { id: upstreamModel },
+        },
+        forwardBody,
+        ac.signal
+      )
     );
   } catch (err) {
-    clearInterval(keepalive);
     const isUpstream = err instanceof UpstreamError;
-    const status = isUpstream ? (err as UpstreamError).status : 500;
-    const code = isUpstream ? (err as UpstreamError).code : "internal_error";
+    const status = isUpstream ? (err as UpstreamError).status : 502;
+    const code = isUpstream ? (err as UpstreamError).code : "upstream_unreachable";
     const message = (err as Error).message;
     if (!isUpstream) {
       log.error("responses passthrough stream pre-request failed", { error: message });
     }
-    if (!res.writableEnded) {
-      res.write(sseErrorEvent(code, message));
-      res.end();
+    if (isUpstream) {
+      sendUpstreamErrorJson(res, err as UpstreamError);
+    } else {
+      sendJson(res, 502, errorEnvelope(502, code, message));
     }
     recordLog(cfg, {
       ...baseEntry,
@@ -1206,6 +1351,19 @@ async function handleResponsesPassthrough(
     });
     return;
   }
+
+  // Upstream answered 200 — NOW flush SSE headers and keepalive, then pipe.
+  res.statusCode = 200;
+  res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
+  res.setHeader("Connection", "keep-alive");
+  if (typeof (res as unknown as { flushHeaders?: () => void }).flushHeaders === "function") {
+    (res as unknown as { flushHeaders: () => void }).flushHeaders();
+  }
+  const keepalive = setInterval(() => {
+    if (!res.writableEnded) res.write(": keepalive\n\n");
+  }, KEEPALIVE_INTERVAL_MS);
+  res.on("close", () => clearInterval(keepalive));
 
   let streamError: Error | null = null;
   try {
@@ -1492,23 +1650,25 @@ async function handleChatPassthrough(
 
   let upstreamRes: Response;
   try {
-    upstreamRes = await callOpenAICompat(
-      {
-        baseUrl: runtime.baseUrl,
-        apiKey: runtime.apiKey,
-        userAgent: cfg.userAgent,
-        enhanceError: provider.enhanceError.bind(provider),
-        contextOverflowMode: cfg.contextOverflowMode,
-        modelInfo: modelInfo
-          ? { id: modelInfo.id, contextWindow: modelInfo.contextWindow }
-          : { id: upstreamModel },
-      },
-      body,
-      ac.signal
+    upstreamRes = await trackLane(provider, upstreamModel, () =>
+      callOpenAICompat(
+        {
+          baseUrl: runtime.baseUrl,
+          apiKey: runtime.apiKey,
+          userAgent: cfg.userAgent,
+          enhanceError: provider.enhanceError.bind(provider),
+          contextOverflowMode: cfg.contextOverflowMode,
+          modelInfo: modelInfo
+            ? { id: modelInfo.id, contextWindow: modelInfo.contextWindow }
+            : { id: upstreamModel },
+        },
+        body,
+        ac.signal
+      )
     );
   } catch (err) {
     if (err instanceof UpstreamError) {
-      sendJson(res, err.status, errorEnvelope(err.status, err.code, err.message));
+      sendUpstreamErrorJson(res, err);
       recordLog(cfg, {
         ...baseEntry,
         status_code: err.status,
@@ -1672,12 +1832,55 @@ function handleModels(cfg: Config, res: ServerResponse): void {
   const data: Array<{ id: string; object: "model"; owned_by: string }> = [];
   for (const p of ordered) {
     if (!cfg.providers[p.id]) continue;
-    const ownedBy = p.id === "mimo" ? "xiaomi" : "deepseek";
+    const ownedBy = p.id === "mimo" ? "xiaomi" : p.id;
     for (const m of p.builtinModels) {
+      // Bare id plus every client-facing alias (provider-qualified slugs included)
+      // so other OpenAI clients can address each lane explicitly too.
       data.push({ id: m.id, object: "model", owned_by: ownedBy });
+      for (const alias of m.aliases ?? []) {
+        data.push({ id: alias, object: "model", owned_by: ownedBy });
+      }
     }
   }
   sendJson(res, 200, { object: "list", data });
+}
+
+// GET /model_catalog — codex `model_catalog_url` endpoint. Serves the
+// provider-aggregated catalog in codex ModelsResponse format, with an ETag
+// and If-None-Match handling (codex caches the catalog keyed by ETag).
+function handleModelCatalog(
+  cfg: Config,
+  req: IncomingMessage,
+  res: ServerResponse
+): void {
+  const ordered: Provider[] = [
+    PROVIDERS[cfg.defaultProviderId],
+    ...PROVIDER_LIST.filter((p) => p.id !== cfg.defaultProviderId),
+  ];
+  const keyed = ordered.filter(
+    (p) => cfg.providers[p.id] && p.builtinModels && p.builtinModels.length > 0
+  );
+  let body: string;
+  let etag: string;
+  try {
+    const catalogPath = resolveCodexCatalogPath(process.env, cfg.dataDir);
+    ({ body, etag } = getCodexModelCatalog(keyed, catalogPath));
+  } catch (err) {
+    log.warn("codex model catalog unavailable", { error: (err as Error).message });
+    sendJson(res, 503, errorEnvelope(503, "model_catalog_unavailable", (err as Error).message));
+    return;
+  }
+  const ifNoneMatch = req.headers["if-none-match"];
+  if (typeof ifNoneMatch === "string" && ifNoneMatch === etag) {
+    res.statusCode = 304;
+    res.setHeader("ETag", etag);
+    res.end();
+    return;
+  }
+  res.statusCode = 200;
+  res.setHeader("Content-Type", "application/json");
+  res.setHeader("ETag", etag);
+  res.end(body);
 }
 
 export function startServer(cfg: Config): Server {
@@ -1743,6 +1946,15 @@ export function startServer(cfg: Config): Server {
 
     if (req.method === "GET" && url.startsWith("/v1/models")) {
       handleModels(cfg, res);
+      return;
+    }
+    // codex model_catalog_url — exact path ("/model_catalog?client_version=…"
+    // also matches). "/v1/model_catalog" alias for posterity.
+    if (
+      req.method === "GET" &&
+      (url.startsWith("/model_catalog") || url.startsWith("/v1/model_catalog"))
+    ) {
+      handleModelCatalog(cfg, req, res);
       return;
     }
     if (req.method === "POST" && url.startsWith("/v1/responses")) {

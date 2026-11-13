@@ -94,6 +94,8 @@ function parseModels(raw: unknown, providerId: string): ProviderModel[] {
       maxOutputTokens: typeof obj.maxOutputTokens === "number" ? obj.maxOutputTokens : undefined,
       deprecatedAfter:
         typeof obj.deprecatedAfter === "string" ? obj.deprecatedAfter : undefined,
+      note: typeof obj.note === "string" ? obj.note : undefined,
+      paygOnly: typeof obj.paygOnly === "boolean" ? obj.paygOnly : undefined,
     };
   });
 }
@@ -157,6 +159,10 @@ function parseSpec(raw: unknown, idx: number): GenericProviderSpec {
           extractThinkTags:
             typeof features.extractThinkTags === "boolean"
               ? features.extractThinkTags
+              : undefined,
+          nonStreamingUpstream:
+            typeof features.nonStreamingUpstream === "boolean"
+              ? features.nonStreamingUpstream
               : undefined,
           dropResponseFormat:
             typeof features.dropResponseFormat === "boolean"
@@ -242,7 +248,22 @@ export function writeSpecsToFile(filePath: string, specs: GenericProviderSpec[])
   if (dir && !existsSync(dir)) {
     mkdirSync(dir, { recursive: true });
   }
-  writeFileSync(filePath, JSON.stringify({ providers: specs }, null, 2) + "\n", "utf-8");
+  // The admin form edits only providers. Keep the root-level catalog path and
+  // editor schema reference when rewriting an existing providers.json.
+  let metadata: Record<string, string> = {};
+  if (existsSync(filePath)) {
+    try {
+      const existing: unknown = JSON.parse(readFileSync(filePath, "utf-8"));
+      if (existing && typeof existing === "object" && !Array.isArray(existing)) {
+        const root = existing as Record<string, unknown>;
+        if (typeof root.$schema === "string") metadata.$schema = root.$schema;
+        if (typeof root.codexCatalog === "string") metadata.codexCatalog = root.codexCatalog;
+      }
+    } catch {
+      // Allow the admin editor to repair a malformed providers.json.
+    }
+  }
+  writeFileSync(filePath, JSON.stringify({ ...metadata, providers: specs }, null, 2) + "\n", "utf-8");
 }
 
 function loadFromFile(filePath: string): GenericProviderSpec[] {

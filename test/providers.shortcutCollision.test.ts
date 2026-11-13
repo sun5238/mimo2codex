@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -95,6 +95,47 @@ describe("readSpecsFromFile — kimi enhanceErrorPreset (was silently dropped)",
       ]);
       const read = readSpecsFromFile(f);
       expect(read[0].features?.enhanceErrorPreset).toBe("kimi");
+    });
+  });
+});
+
+describe("writeSpecsToFile — root metadata", () => {
+  it("preserves the editor schema and catalog path after an admin save", () => {
+    withTmp((f) => {
+      writeFileSync(f, JSON.stringify({
+        $schema: "../mimo2codex-fork/schemas/providers.schema.json",
+        codexCatalog: "catalog/custom.json",
+        providers: [spec({ id: "old" })],
+      }));
+      writeSpecsToFile(f, [spec({ id: "new" })]);
+      const saved = JSON.parse(readFileSync(f, "utf-8"));
+      expect(saved.$schema).toBe("../mimo2codex-fork/schemas/providers.schema.json");
+      expect(saved.codexCatalog).toBe("catalog/custom.json");
+      expect(saved.providers).toHaveLength(1);
+      expect(saved.providers[0].id).toBe("new");
+    });
+  });
+
+  it("can repair a malformed existing file", () => {
+    withTmp((f) => {
+      writeFileSync(f, "{bad json");
+      expect(() => writeSpecsToFile(f, [spec({ id: "repaired" })])).not.toThrow();
+      expect(JSON.parse(readFileSync(f, "utf-8")).providers[0].id).toBe("repaired");
+    });
+  });
+});
+
+describe("readSpecsFromFile — declared model metadata", () => {
+  it("keeps model notes and payg-only restrictions", () => {
+    withTmp((f) => {
+      writeFileSync(f, JSON.stringify({
+        providers: [spec({ id: "custom", models: [{ id: "m", note: "approval required", paygOnly: true }] })],
+      }));
+      expect(readSpecsFromFile(f)[0].models?.[0]).toMatchObject({
+        id: "m",
+        note: "approval required",
+        paygOnly: true,
+      });
     });
   });
 });

@@ -39,6 +39,12 @@ export interface GenericProviderSpec {
     webSearch?: boolean;
     forceParallelToolCalls?: boolean;
     /**
+     * 选填。上游在流式下不稳/出错时打开：对上游强制
+     * `stream:false` 取一次完整 JSON，再由网关合成 codex 侧的 SSE 帧。
+     * 代价：失去打字机体验（整段蹦出）。
+     */
+    nonStreamingUpstream?: boolean;
+    /**
      * 选填。命中预设时（"sensenova" / "minimax"）generic 的 enhanceError hook 会用
      * src/providers/presets.ts 中内置的硬编码诊断翻译表把上游模糊化的 400 翻成
      * 可读 hint（比如 SenseNova 的 "Errors in message queue response"）。默认 unset
@@ -196,6 +202,11 @@ export function createGenericProvider(spec: GenericProviderSpec): Provider {
       // Identity passthrough — the routing layer will substitute `model`
       // separately. Hook exists so users can later override for upstream
       // quirks without changing the server's branching logic.
+      //
+      // (P2 note, 2026-11-13: a foreign-reasoning-ID filter lived here briefly
+      // — an OpenAI-family model behind the lane used to 400 foreign-minted
+      // `msg_` reasoning IDs with "Expected an ID that begins with 'rs'". Verified fixed upstream-side
+      // via A/B replay, the filter was removed rather than shipped dormant.)
       return req;
     },
 
@@ -212,6 +223,7 @@ export function createGenericProvider(spec: GenericProviderSpec): Provider {
     // 模型同样是 inline think 格式）。
     responseFlags: {
       extractInlineThink: !!features.minimaxCompat || !!features.extractThinkTags,
+      nonStreamingUpstream: !!features.nonStreamingUpstream,
     },
   };
 }

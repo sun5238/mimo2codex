@@ -4,8 +4,13 @@ import { buildConfig, parseArgv, type Config } from "./config.js";
 import { startServer } from "./server.js";
 import { setVerbose, log, redactKey } from "./util/log.js";
 import { closeDb, openDb } from "./db/index.js";
-import { initRegistry } from "./providers/registry.js";
+import { BUILTIN_PROVIDERS, initRegistry } from "./providers/registry.js";
 import { loadGenericProviders, GenericLoaderError } from "./providers/genericLoader.js";
+import { deriveLaneAliases } from "./providers/laneAliases.js";
+import {
+  resolveCodexCatalogPath,
+  warmCodexModelCatalog,
+} from "./codex/modelCatalog.js";
 import { resolveDataDir } from "./db/dataDir.js";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
@@ -18,7 +23,7 @@ import {
   ensureDataDirEnv,
   refreshDataDirExample,
 } from "./setup/initEnv.js";
-import { PROVIDER_LIST } from "./providers/registry.js";
+import { PROVIDER_LIST, PROVIDERS } from "./providers/registry.js";
 import {
   getCachedStatus,
   refreshCacheInBackground,
@@ -616,6 +621,9 @@ async function main(): Promise<void> {
 
   try {
     const generics = loadGenericProviders(process.env, dataDirForLoader);
+    // Each declared model gets a `<model-id>@<provider-id>` alias before the
+    // registry freezes — see providers/laneAliases.ts.
+    deriveLaneAliases([...BUILTIN_PROVIDERS, ...generics]);
     initRegistry(generics);
   } catch (err) {
     if (err instanceof GenericLoaderError) {
@@ -654,6 +662,30 @@ async function main(): Promise<void> {
     cfg = buildConfig(parsed, process.env, VERSION);
   } catch (err) {
     // eslint-disable-next-line no-console
+    console.error(`error: ${(err as Error).message}`);
+    process.exit(2);
+  }
+
+  // Snapshot the catalog at boot when configured. The default file is optional
+  // for users who do not use Codex model discovery; explicit missing paths
+  // and invalid catalogs still fail during startup.
+  try {
+    const ordered = [
+      PROVIDERS[cfg.defaultProviderId],
+      ...PROVIDER_LIST.filter((p) => p.id !== cfg.defaultProviderId),
+    ];
+    const catalogPath = resolveCodexCatalogPath(process.env, cfg.dataDir);
+    if (existsSync(catalogPath)) {
+      warmCodexModelCatalog(
+        ordered.filter(
+          (p) => cfg.providers[p.id] && p.builtinModels && p.builtinModels.length > 0
+        ),
+        catalogPath
+      );
+    }
+  } catch (err) {
+    // A broken catalog makes model discovery unusable; fail at boot rather
+    // than serving a partial snapshot or hiding the error until first GET.
     console.error(`error: ${(err as Error).message}`);
     process.exit(2);
   }

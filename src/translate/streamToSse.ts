@@ -1,5 +1,6 @@
 import type {
   ChatAnnotation,
+  ChatResponse,
   ChatStreamChunk,
   ResponsesObject,
   ResponsesOutputItem,
@@ -518,6 +519,51 @@ function flushThinkSplitter(sink: SseSink, state: StreamState): void {
       delta: content,
     });
   }
+}
+
+// features.nonStreamingUpstream support: express one complete (stream:false)
+// ChatResponse as a single-chunk "stream", so the normal chat→SSE machinery
+// emits the full codex event choreography (response.created, per-item
+// output_item.added/done, response.completed). Codex collects output items
+// from the per-item events — a bare created+completed pair would complete the
+// turn with an empty item list.
+export function chatResponseToChunkStream(chat: ChatResponse): AsyncIterable<ChatStreamChunk> {
+  const choice = chat.choices[0];
+  const message = choice?.message;
+  const chunk: ChatStreamChunk = {
+    id: chat.id ?? "chatcmpl-buffered",
+    object: "chat.completion.chunk",
+    created: chat.created ?? 0,
+    model: chat.model ?? "",
+    choices: [
+      {
+        index: 0,
+        delta: {
+          role: "assistant",
+          content: message?.content ?? null,
+          reasoning_content:
+            (message as { reasoning_content?: string | null } | undefined)?.reasoning_content ??
+            null,
+          tool_calls: message?.tool_calls?.map((tc, i) => ({
+            index: i,
+            id: tc.id,
+            type: "function" as const,
+            function: {
+              name: tc.function?.name,
+              arguments: typeof tc.function?.arguments === "string"
+                ? tc.function.arguments
+                : JSON.stringify(tc.function?.arguments ?? {}),
+            },
+          })),
+        },
+        finish_reason: choice?.finish_reason ?? null,
+      },
+    ],
+    usage: chat.usage,
+  };
+  return (async function* () {
+    yield chunk;
+  })();
 }
 
 export async function pipeChatStreamToResponses(

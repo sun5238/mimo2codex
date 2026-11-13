@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mimo2codex.dev/schemas/providers.schema.json",
+  "title": "mimo2codex providers.json",
+  "description": "Declare generic OpenAI-compatible upstreams (lanes). Loaded once at boot; changes require a restart. An optional top-level $schema can point to this local file for editor validation.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "codexCatalog": {
+      "type": "string",
+      "description": "Path of the codex model-catalog metadata file (served at GET /model_catalog), relative to the data directory. Default: <dataDir>/codex-catalog.json. Env override: MIMO2CODEX_CODEX_CATALOG."
+    },
+    "providers": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/genericProvider" }
+    }
+  },
+  "required": ["providers"],
+  "$defs": {
+    "genericProvider": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "not": { "enum": ["mimo", "deepseek"] },
+          "description": "Unique provider id. Registry order = priority for bare model names. Also the sole suffix for derived `model@provider-id` aliases."
+        },
+        "shortcut": {
+          "type": "string",
+          "description": "CLI/webui short code. Must be unique across all providers including built-ins (mimo / ds). Defaults to id."
+        },
+        "displayName": { "type": "string" },
+        "baseUrl": {
+          "type": "string",
+          "description": "Upstream OpenAI-compatible base URL, e.g. https://api.example.com/v1 (required)."
+        },
+        "envKey": {
+          "type": "string",
+          "description": "Name of the environment variable holding this provider's API key (required). <NAME>_BASE_URL overrides baseUrl if set."
+        },
+        "defaultModel": {
+          "type": "string",
+          "description": "Fallback model id (required). Used when the client model matches the provider catalog but not a declared model, or when forceDefaultModel is on."
+        },
+        "wireApi": {
+          "enum": ["chat", "responses"],
+          "description": "\"chat\" (default): translate Codex Responses → Chat Completions. \"responses\": pipe the Responses payload through unchanged."
+        },
+        "docsUrl": { "type": "string" },
+        "forceDefaultModel": {
+          "type": "boolean",
+          "description": "Rewrite any client model id to defaultModel (open-catalog providers only)."
+        },
+        "models": {
+          "type": "array",
+          "description": "Declared catalog. Empty/absent = open-catalog passthrough (any model id forwarded verbatim).",
+          "items": { "$ref": "#/$defs/model" }
+        },
+        "features": { "$ref": "#/$defs/features" }
+      },
+      "required": ["id", "baseUrl", "envKey", "defaultModel"]
+    },
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "description": "Model id as sent upstream (required)." },
+        "aliases": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Extra client-facing names that route to this model. `model@lane` aliases are derived automatically — hand-write only legacy names."
+        },
+        "displayName": { "type": "string", "description": "Picker label; lane-qualified entries get a `· lane` suffix appended." },
+        "contextWindow": { "type": "integer", "description": "Lane-level context-window override; feeds the codex catalog entry." },
+        "maxOutputTokens": { "type": "integer", "description": "Lane-level output cap; used by generated Codex config snippets." },
+        "supportsImages": { "type": "boolean" },
+        "supportsReasoning": { "type": "boolean" },
+        "supportsWebSearch": { "type": "boolean" },
+        "deprecatedAfter": { "type": "string" },
+        "note": { "type": "string", "description": "Short access/availability note rendered as a trailing comment in config.toml." },
+        "paygOnly": { "type": "boolean" }
+      },
+      "required": ["id"]
+    },
+    "features": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "webSearch": { "type": "boolean" },
+        "forceParallelToolCalls": { "type": "boolean" },
+        "nonStreamingUpstream": {
+          "type": "boolean",
+          "description": "Ask the upstream for one complete JSON (stream:false) and synthesize the codex-side SSE frames from it. For backends that break under streaming. Cost: no token-by-token output."
+        },
+        "minimaxCompat": { "type": "boolean", "description": "Enable the whole inline-think/Strict-sanitizer bundle." },
+        "dropNullStrict": { "type": "boolean" },
+        "dropNullContent": { "type": "boolean" },
+        "dropToolChoiceAuto": { "type": "boolean" },
+        "dropStreamOptions": { "type": "boolean" },
+        "dropParallelToolCalls": { "type": "boolean" },
+        "mergeSystemMessages": { "type": "boolean" },
+        "extractThinkTags": { "type": "boolean" },
+        "dropResponseFormat": { "type": "boolean" },
+        "dropNonFunctionTools": { "type": "boolean" },
+        "dropReasoningEffort": { "type": "boolean" },
+        "enhanceErrorPreset": { "enum": ["sensenova", "minimax", "kimi"] }
+      }
+    }
+  }
+}

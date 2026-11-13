@@ -118,5 +118,9 @@ export interface Provider {
   // 后续若再加响应侧 sanitizer 共用这一个对象，避免接口爆炸。
   responseFlags?: {
     extractInlineThink?: boolean;
+    // Buffer the upstream's single complete (stream:false) chat response and
+    // synthesize the codex-side SSE frames from it. For backends that break
+    // under streaming. Known cost: no token-by-token output.
+    nonStreamingUpstream?: boolean;
   };
 }

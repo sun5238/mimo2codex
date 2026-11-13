@@ -1,0 +1,1917 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ModelsResponse",
+  "description": "Generated from Codex ModelsResponse/ModelInfo. One bare model per base id; the gateway expands provider aliases on the wire. Gateway annotations cover the custom instruction requirement, serde shell_type aliases and nonnegative context windows.",
+  "type": "object",
+  "required": [
+    "models"
+  ],
+  "properties": {
+    "models": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ModelInfo"
+      },
+      "minItems": 1
+    },
+    "$schema": {
+      "type": "string"
+    }
+  },
+  "definitions": {
+    "ApplyPatchToolType": {
+      "type": "string",
+      "enum": [
+        "freeform"
+      ]
+    },
+    "ApprovalMessages": {
+      "type": "object",
+      "properties": {
+        "auto_review_suffix": {
+          "description": "Optional introduction to the harness-owned automatic escalation review policy.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "granular": {
+          "description": "Optional catalog templates for harness-owned granular approval facts.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/GranularApprovalMessages"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "never": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "on_request": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "on_request_auto_review": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "request_permissions": {
+          "description": "Optional replacement heading for the request_permissions tool instructions.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "unless_trusted": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "AsyncClassifierMode": {
+      "description": "Legacy classifier modes retained for configuration and model-catalog compatibility.",
+      "type": "string",
+      "enum": [
+        "snapshot",
+        "conversation"
+      ]
+    },
+    "AutoReviewMessages": {
+      "type": "object",
+      "properties": {
+        "node_repl_policy": {
+          "description": "Extra developer policy for `node_repl` and `cua_repl` reviews.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "policy": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "policy_template": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "rejection_instructions": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "timeout_instructions": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "CodeModeToolMessages": {
+      "description": "Model-owned instructions for Code Mode's exec and wait tools.",
+      "type": "object",
+      "properties": {
+        "deferred_nested_tools_guidance": {
+          "description": "Literal guidance appended when deferred nested tools exist. Missing or null uses bundled text; an empty string omits the section.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "exec": {
+          "description": "Instructional template supporting `{{ default_exec_yield_time_ms }}` and `{{ image_helper }}`. Runtime tool declarations are appended. Unknown placeholders remain literal. Exec accepts raw JavaScript; `parameters` is not consumed and its grammar is unchanged.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ToolMessage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "mcp_typescript_preamble": {
+          "description": "Literal shared TypeScript definitions, emitted when Code Mode Only exposes MCP results. Missing or null uses bundled definitions; an empty string omits the section. Custom definitions must remain compatible with the generated tool declarations.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "wait": {
+          "description": "Complete description and JSON parameter schema, selected independently.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ToolMessage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "CollaborationModeMessages": {
+      "type": "object",
+      "properties": {
+        "default": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "plan": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "ConfigShellToolType": {
+      "description": "Shell execution capability for a model.",
+      "type": "string",
+      "enum": [
+        "unified_exec",
+        "disabled",
+        "default",
+        "local",
+        "shell_command"
+      ]
+    },
+    "ConfirmationPolicies": {
+      "description": "Model-owned confirmation-policy Markdown, forwarded unchanged to actor tools.",
+      "type": "object",
+      "properties": {
+        "browser_use": {
+          "description": "Replacement Markdown for the Browser Use confirmation-policy document.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "computer_use": {
+          "description": "Replacement Markdown for the native Computer Use confirmation policy.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "ContextManagementToolMessages": {
+      "description": "Model-owned context-window control tool definitions.",
+      "type": "object",
+      "properties": {
+        "get_context_remaining": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ToolMessage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "new_context": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ToolMessage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "CyberAccessProgram": {
+      "description": "Requested cyber treatment for an OpenAI model turn. Authorization and model-tier restrictions remain server-owned.",
+      "type": "string",
+      "enum": [
+        "standard",
+        "daybreak_blue",
+        "daybreak_red"
+      ]
+    },
+    "GranularApprovalMessages": {
+      "description": "Catalog presentation for granular approval policy; the harness owns the policy and lists. This wire type preserves templates verbatim; validation and rendering are consumer concerns.",
+      "type": "object",
+      "properties": {
+        "intro": {
+          "description": "Rendering contract: at most 500 UTF-8 bytes with exactly one `{{ policy }}` marker. Consumers must use bundled text for missing, null, empty, invalid, or oversized templates.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "prompted_categories": {
+          "description": "Presentation around `{{ categories }}`, including the fixed prompted-bucket label. Uses the same byte limit and fallback rules as `intro`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "rejected_categories": {
+          "description": "Presentation around `{{ categories }}`, including the fixed rejected-bucket label. Uses the same byte limit and fallback rules as `intro`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "GuardianModelPolicy": {
+      "description": "A complete model policy. Omitted scopes are disabled; unknown fields are ignored. Code Mode wrappers have no approval scope; their nested tools follow this policy.",
+      "type": "object",
+      "properties": {
+        "computer_use": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/GuardianReviewMode"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "file_changes": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/GuardianReviewMode"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "initial_cua_call": {
+          "description": "Omission retains the existing allowance for adaptive computer use.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "mcp": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/GuardianReviewMode"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "network": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/GuardianReviewMode"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "other_tools": {
+          "description": "Coverage for tools without an approval category.",
+          "default": "disabled",
+          "allOf": [
+            {
+              "$ref": "#/definitions/GuardianReviewMode"
+            }
+          ]
+        },
+        "permissions": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/GuardianReviewMode"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sandboxed_exec_commands": {
+          "description": "Whether adaptive shell coverage includes ordinary sandboxed commands.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "shell": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/GuardianReviewMode"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "unscored_action": {
+          "default": "invalidate_score",
+          "allOf": [
+            {
+              "$ref": "#/definitions/GuardianUnscoredAction"
+            }
+          ]
+        }
+      }
+    },
+    "GuardianReviewMode": {
+      "description": "How Guardian handles an action when the user selects automatic approval.",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "disabled",
+            "synchronous",
+            "unknown"
+          ]
+        },
+        {
+          "description": "Use a current low-risk score; otherwise run synchronous review.",
+          "type": "string",
+          "enum": [
+            "adaptive"
+          ]
+        }
+      ]
+    },
+    "GuardianUnscoredAction": {
+      "description": "How actions outside adaptive coverage affect cached classification evidence.",
+      "type": "string",
+      "enum": [
+        "ignore",
+        "age_score",
+        "invalidate_score"
+      ]
+    },
+    "GuardianV2ModelConfig": {
+      "description": "Optional model-owned defaults for Guardian v2 classification experiments.",
+      "type": "object",
+      "properties": {
+        "async_classifier_conversation_token_limit": {
+          "description": "Reset retained async history when the next request exceeds this token estimate.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0
+        },
+        "async_classifier_mode": {
+          "description": "Deprecated and ignored; asynchronous classification always uses conversations.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/AsyncClassifierMode"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "classifier_instructions": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "max_action_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0
+        },
+        "max_classifier_instruction_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0
+        },
+        "max_parent_compaction_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0
+        },
+        "max_tool_call_lag": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0
+        },
+        "reasoning_effort": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ReasoningEffort"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reuse_parent_compaction": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "review_threshold_basis_points": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint16",
+          "minimum": 0
+        },
+        "transcript": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/GuardianV2TranscriptModelConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "GuardianV2TranscriptModelConfig": {
+      "description": "Optional model-owned defaults for selecting and bounding Guardian v2 history.",
+      "type": "object",
+      "properties": {
+        "include_images": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "max_message_entry_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0
+        },
+        "max_message_transcript_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0
+        },
+        "max_recent_non_user_entries": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0
+        },
+        "max_tool_entry_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0
+        },
+        "max_tool_transcript_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0
+        },
+        "sources": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "HistoryToolMessages": {
+      "description": "Model-owned history namespace and public tool definitions.",
+      "type": "object",
+      "properties": {
+        "list_items": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ToolMessage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "list_windows": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ToolMessage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "namespace_description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "read_item": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ToolMessage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "search_contents": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ToolMessage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "IncrementalToolMessages": {
+      "description": "Incremental tool notice overrides; missing/null or >512-byte values use bundled defaults. Empty strings omit static text but retain runtime names and instructions.",
+      "type": "object",
+      "properties": {
+        "namespace_instructions_cleared": {
+          "description": "Message supporting `{name}` when a namespace's instructions are cleared.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "namespace_instructions_prefix": {
+          "description": "Prefix supporting `{name}`; the namespace instructions are appended verbatim.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "removed_namespaces_header": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "removed_tools_header": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tool_update_hint": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "IndirectDescriptionPrefixes": {
+      "description": "Plain-text prefixes for Code Mode documentation, ALL_TOOLS, and loaded tool-search namespaces. Flat indirect entries carry these before any per-function prefix. Values are trimmed, and selectors for the same final namespace must agree, including empty values. Empty values add no prefix; unregistered targets are ignored.",
+      "type": "object",
+      "properties": {
+        "mcp_servers": {
+          "description": "Configured MCP server names, before callable namespace normalization. Each prefix applies to all namespaces exposed by that server.",
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "namespaces": {
+          "description": "Exact rendered namespaces, including `functions` for plain tools. Overlap with an MCP server prefix is allowed only when the trimmed values match.",
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "InputModality": {
+      "description": "Canonical user-input modality tags advertised by a model.",
+      "oneOf": [
+        {
+          "description": "Plain text turns and tool payloads.",
+          "type": "string",
+          "enum": [
+            "text"
+          ]
+        },
+        {
+          "description": "Image attachments included in user turns.",
+          "type": "string",
+          "enum": [
+            "image"
+          ]
+        },
+        {
+          "description": "Audio attachments included in user turns.",
+          "type": "string",
+          "enum": [
+            "audio"
+          ]
+        }
+      ]
+    },
+    "McpResourceToolMessages": {
+      "description": "Model-owned descriptions and parameters for the built-in MCP resource helpers.",
+      "type": "object",
+      "properties": {
+        "list_mcp_resource_templates": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ToolMessage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "list_mcp_resources": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ToolMessage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "read_mcp_resource": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ToolMessage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "ModelAccessPrograms": {
+      "type": "object",
+      "required": [
+        "cyber"
+      ],
+      "properties": {
+        "cyber": {
+          "description": "Accepted explicit selections. An empty list is distinct from missing metadata.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/CyberAccessProgram"
+          }
+        }
+      }
+    },
+    "ModelAvailabilityNux": {
+      "type": "object",
+      "required": [
+        "message"
+      ],
+      "properties": {
+        "message": {
+          "type": "string"
+        }
+      }
+    },
+    "ModelInfo": {
+      "description": "Model metadata returned by the Codex backend `/models` endpoint.",
+      "type": "object",
+      "required": [
+        "display_name",
+        "experimental_supported_tools",
+        "priority",
+        "shell_type",
+        "slug",
+        "support_verbosity",
+        "supported_in_api",
+        "supported_reasoning_levels",
+        "truncation_policy",
+        "visibility"
+      ],
+      "properties": {
+        "additional_speed_tiers": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "apply_patch_tool_type": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ApplyPatchToolType"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "auto_compact_token_limit": {
+          "description": "Token threshold for automatic compaction. When omitted, core derives it from `context_window` (90%). When provided, core clamps it to 90% of the context window when available.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int64",
+          "minimum": 0
+        },
+        "auto_review_model_override": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "availability_nux": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ModelAvailabilityNux"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "available_access_programs": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ModelAccessPrograms"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "comp_hash": {
+          "description": "Opaque identifier for compaction-compatible model configurations.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "context_window": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int64",
+          "minimum": 0
+        },
+        "default_reasoning_level": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ReasoningEffort"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "default_reasoning_summary": {
+          "default": "auto",
+          "allOf": [
+            {
+              "$ref": "#/definitions/ReasoningSummary"
+            }
+          ]
+        },
+        "default_service_tier": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "default_verbosity": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Verbosity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "display_name": {
+          "type": "string",
+          "description": "Use the same bare name as slug; the gateway rewrites both fields together."
+        },
+        "effective_context_window_percent": {
+          "description": "Percentage of the context window considered usable for inputs, after reserving headroom for system prompts, tool overhead, and model output.",
+          "default": 95,
+          "type": "integer",
+          "format": "int64",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "experimental_supported_tools": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "guardian": {
+          "description": "Model-owned approval coverage. Absent preserves legacy settings; an empty map disables ordinary Guardian review. Keys are computer_use, shell, file_changes, mcp, network, and permissions. This does not override mandatory safety or administrator requirements.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/GuardianModelPolicy"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "include_apps_usage_instructions": {
+          "default": true,
+          "type": "boolean"
+        },
+        "include_plugin_usage_instructions": {
+          "default": false,
+          "type": "boolean"
+        },
+        "include_skills_usage_instructions": {
+          "default": false,
+          "type": "boolean"
+        },
+        "input_modalities": {
+          "description": "Input modalities accepted by the backend for this model.",
+          "default": [
+            "text",
+            "image"
+          ],
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/InputModality"
+          }
+        },
+        "max_context_window": {
+          "description": "Maximum context window allowed for config overrides.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int64",
+          "minimum": 0
+        },
+        "model_messages": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ModelMessages"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "model_specialty": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "multi_agent_reasoning_effort": {
+          "description": "Reasoning effort used for multi-agent work when the user selects Ultra.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ReasoningEffort"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "multi_agent_version": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/MultiAgentVersion"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "node_repl_auto_review_required": {
+          "default": false,
+          "type": "boolean"
+        },
+        "node_repl_disabled": {
+          "default": false,
+          "type": "boolean"
+        },
+        "priority": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "service_tiers": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ModelServiceTier"
+          }
+        },
+        "shell_type": {
+          "$ref": "#/definitions/ConfigShellToolType"
+        },
+        "slug": {
+          "type": "string",
+          "description": "Bare model id in this file; the gateway adds @provider.id only in its remote response."
+        },
+        "support_verbosity": {
+          "type": "boolean"
+        },
+        "supported_in_api": {
+          "type": "boolean"
+        },
+        "supported_reasoning_levels": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ReasoningEffortPreset"
+          }
+        },
+        "supports_experimental_context": {
+          "description": "Whether experimental context management may be activated at session startup.",
+          "default": false,
+          "type": "boolean"
+        },
+        "supports_image_detail_original": {
+          "default": false,
+          "type": "boolean"
+        },
+        "supports_reasoning_effort_updates": {
+          "description": "Whether the model accepts reasoning-effort `configuration_update` items. Missing metadata keeps effort changes on the ordinary request parameter.",
+          "default": false,
+          "type": "boolean"
+        },
+        "supports_reasoning_summary_parameter": {
+          "description": "Whether the model accepts the Responses API `reasoning.summary` parameter.",
+          "type": "boolean"
+        },
+        "supports_search_tool": {
+          "default": false,
+          "type": "boolean"
+        },
+        "tool_mode": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ToolMode"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "truncation_policy": {
+          "$ref": "#/definitions/TruncationPolicyConfig"
+        },
+        "upgrade": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ModelInfoUpgrade"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "use_responses_lite": {
+          "default": false,
+          "type": "boolean"
+        },
+        "visibility": {
+          "$ref": "#/definitions/ModelVisibility"
+        },
+        "web_search_tool_type": {
+          "default": "text",
+          "allOf": [
+            {
+              "$ref": "#/definitions/WebSearchToolType"
+            }
+          ]
+        },
+        "base_instructions": {
+          "type": "string",
+          "description": "Legacy alternative to model_messages.instructions_template."
+        }
+      },
+      "allOf": [
+        {
+          "anyOf": [
+            {
+              "required": [
+                "base_instructions"
+              ],
+              "properties": {
+                "base_instructions": {
+                  "type": "string"
+                }
+              }
+            },
+            {
+              "required": [
+                "model_messages"
+              ],
+              "properties": {
+                "model_messages": {
+                  "type": "object",
+                  "required": [
+                    "instructions_template"
+                  ],
+                  "properties": {
+                    "instructions_template": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "ModelInfoUpgrade": {
+      "type": "object",
+      "required": [
+        "migration_markdown",
+        "model"
+      ],
+      "properties": {
+        "migration_markdown": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "retirement_at": {
+          "description": "Informational time when the model associated with this upgrade is scheduled to retire.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "ModelMessages": {
+      "description": "A strongly-typed template for assembling model instructions and developer messages.\n\n`instructions_template`: Formerly a personality template, now literal text. The name is retained for model catalog compatibility.",
+      "type": "object",
+      "properties": {
+        "approvals": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ApprovalMessages"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "auto_review": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/AutoReviewMessages"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "collaboration_modes": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/CollaborationModeMessages"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "confirmation_policies": {
+          "description": "Replacement confirmation-policy documents forwarded in actor MCP request metadata.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ConfirmationPolicies"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "content_filter_guidance": {
+          "description": "Developer guidance after a content-filter block. Missing, null, blank, or values over 512 UTF-8 bytes use the bundled guidance.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "guardian_v2": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/GuardianV2ModelConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "instructions_template": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "multi_agent": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/MultiAgentMessages"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "permissions": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/PermissionMessages"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "persistent_instructions": {
+          "description": "Additional developer instructions for persistent mode. Missing or null uses the built-in instructions; an empty string disables them.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "token_budget": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ModelTokenBudgetConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tools": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ToolMessages"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "ModelServiceTier": {
+      "type": "object",
+      "required": [
+        "description",
+        "id",
+        "name"
+      ],
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "ModelTokenBudgetConfig": {
+      "description": "Model-owned defaults for the context-window token-budget feature.",
+      "type": "object",
+      "required": [
+        "auto_compact_fallback_buffer_tokens",
+        "auto_compact_fallback_prompt",
+        "guidance_message",
+        "reminder_message_template",
+        "reminder_threshold_tokens"
+      ],
+      "properties": {
+        "auto_compact_fallback_buffer_tokens": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "auto_compact_fallback_prompt": {
+          "type": "string"
+        },
+        "enabled": {
+          "default": false,
+          "type": "boolean"
+        },
+        "guidance_message": {
+          "type": "string"
+        },
+        "reminder_message_template": {
+          "type": "string"
+        },
+        "reminder_threshold_tokens": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "use_history_notes_extension": {
+          "default": false,
+          "type": "boolean"
+        }
+      }
+    },
+    "ModelVisibility": {
+      "description": "Visibility of a model in the picker or APIs.",
+      "type": "string",
+      "enum": [
+        "list",
+        "hide",
+        "none"
+      ]
+    },
+    "MultiAgentMessages": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/MultiAgentModeMessages"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "role": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/MultiAgentRoleMessages"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "MultiAgentModeMessages": {
+      "type": "object",
+      "properties": {
+        "explicit": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "hint_text": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "proactive": {
+          "description": "Ultra-only mode instructions. Missing or null uses the built-in proactive hint; an empty string suppresses the mode message. `hint_text` takes precedence.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "MultiAgentRoleMessages": {
+      "type": "object",
+      "properties": {
+        "root": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "subagent": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "MultiAgentToolMessages": {
+      "description": "Model-owned descriptions and parameters for Multi-Agent V2 tools, independent of their namespace. Channel tools consume only the description; their parameter schemas are fixed.",
+      "type": "object",
+      "properties": {
+        "create_channel": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ToolMessage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "followup_task": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ToolMessage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "get_channels": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ToolMessage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "interrupt_agent": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ToolMessage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "list_agents": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ToolMessage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "list_threads": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ToolMessage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "post": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ToolMessage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "read_post": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ToolMessage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "read_thread": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ToolMessage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "search_posts": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ToolMessage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "send_message": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ToolMessage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "spawn_agent": {
+          "description": "Replaces the static description. Missing or null uses the bundled text; an empty string suppresses it. Generated model information and local usage hints are retained.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ToolMessage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "subscribe": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ToolMessage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "unsubscribe": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ToolMessage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "wait_agent": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ToolMessage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "MultiAgentVersion": {
+      "type": "string",
+      "enum": [
+        "disabled",
+        "v1",
+        "v2"
+      ]
+    },
+    "NotesToolMessages": {
+      "description": "Model-owned notes namespace and public tool definitions.",
+      "type": "object",
+      "properties": {
+        "append_to_file": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ToolMessage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "list_files_by_prefix": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ToolMessage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "namespace_description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "read_file": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ToolMessage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "search_contents": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ToolMessage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "write_file": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ToolMessage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "PermissionMessages": {
+      "type": "object",
+      "properties": {
+        "approved_command_prefix_saved": {
+          "description": "Optional plain heading for the separate saved-command-prefix notification. The harness formats the prefix list and falls back to its bundled heading for invalid text.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "approved_prefixes": {
+          "description": "Supports `{{ approved_prefixes }}`. Missing or null uses the bundled text; an empty string suppresses the approved-prefix section.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "danger_full_access": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "denied_reads": {
+          "description": "Presentation with exactly one `{{ denied_reads }}` placeholder for the harness-owned denial explanation, no-escalation rule, and path/glob list. Empty, invalid, or oversized templates use the bundled presentation.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "omitted_paths": {
+          "description": "Optional presentation before the harness-owned omission and no-bypass warning. Empty, invalid, or oversized text uses the bundled warning without a lead-in.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "read_only": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "workspace_write": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "writable_root": {
+          "description": "Single writable-root sentence with exactly one `{{ roots }}` placeholder. Missing, null, empty, invalid, or oversized templates use the bundled sentence.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "writable_roots": {
+          "description": "Multiple writable-roots sentence with exactly one `{{ roots }}` placeholder. Missing, null, empty, invalid, or oversized templates use the bundled sentence.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "ReasoningEffort": {
+      "description": "A non-empty reasoning effort value advertised by the model.",
+      "type": "string",
+      "minLength": 1
+    },
+    "ReasoningEffortPreset": {
+      "description": "A reasoning effort option that can be surfaced for a model.",
+      "type": "object",
+      "required": [
+        "description",
+        "effort"
+      ],
+      "properties": {
+        "description": {
+          "description": "Short human description shown next to the effort in UIs.",
+          "type": "string"
+        },
+        "effort": {
+          "description": "Effort level that the model supports.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/ReasoningEffort"
+            }
+          ]
+        }
+      }
+    },
+    "ReasoningSummary": {
+      "description": "A summary of the reasoning performed by the model. This can be useful for debugging and understanding the model's reasoning process. See https://platform.openai.com/docs/guides/reasoning?api-mode=responses#reasoning-summaries",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "auto",
+            "concise",
+            "detailed"
+          ]
+        },
+        {
+          "description": "Option to disable reasoning summaries.",
+          "type": "string",
+          "enum": [
+            "none"
+          ]
+        }
+      ]
+    },
+    "ToolMessage": {
+      "description": "Model-owned messages for a built-in tool.",
+      "type": "object",
+      "properties": {
+        "description": {
+          "description": "Missing or null uses the built-in description; an empty string suppresses its static text without disabling the tool. Tool-owned runtime guidance is retained.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "parameters": {
+          "description": "Complete JSON Schema encoded as a string. Consumed by Multi-Agent V2 tools, Code Mode wait, request_user_input_async (the send_user_message_async catalog key), MCP resource helpers, and Memento V2 tools. Uses the harness's supported schema subset; unrecognized keywords are ignored. Missing, null, invalid or unsupported structures, or a root without `type: \"object\"` retains the harness parameters. Schema semantics must remain API-compatible. Overrides must declare harness-encrypted properties so their annotations can be retained. Argument handling is unchanged.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "ToolMessages": {
+      "description": "Model-owned tool messages and description prefixes.",
+      "type": "object",
+      "properties": {
+        "code_mode": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/CodeModeToolMessages"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "context_management": {
+          "description": "Memento V2 context-window control tool definitions.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ContextManagementToolMessages"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "functions_namespace_functions_description_prefixes": {
+          "description": "Prefixes for individual functions in the `functions` namespace, keyed by unqualified name. Applies to direct declarations, Code Mode, and tool search, including custom tools. Values are trimmed; empty values and unavailable functions add nothing. The trimmed values for available functions plus separating blank lines must fit in 256 UTF-8 bytes in total. This bounds the added text, not the complete definition or its token count. Other namespaces are never affected.",
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "history": {
+          "description": "Native Memento V2 history tool definitions, independent of runtime namespace aliases.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HistoryToolMessages"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "incremental_tools": {
+          "description": "Optional wording for incremental catalog notices.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/IncrementalToolMessages"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "indirect_description_prefixes": {
+          "description": "Optional guidance for indirectly presented tools; missing or empty adds no prefix.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/IndirectDescriptionPrefixes"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "mcp_resources": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/McpResourceToolMessages"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "multi_agent": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/MultiAgentToolMessages"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "notes": {
+          "description": "Native Memento V2 notes tool definitions.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/NotesToolMessages"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "send_user_message_async": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ToolMessage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "ToolMode": {
+      "type": "string",
+      "enum": [
+        "direct",
+        "code_mode",
+        "code_mode_only"
+      ]
+    },
+    "TruncationMode": {
+      "description": "Server-provided truncation policy metadata for a model.",
+      "type": "string",
+      "enum": [
+        "bytes",
+        "tokens"
+      ]
+    },
+    "TruncationPolicyConfig": {
+      "type": "object",
+      "required": [
+        "limit",
+        "mode"
+      ],
+      "properties": {
+        "limit": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "mode": {
+          "$ref": "#/definitions/TruncationMode"
+        }
+      }
+    },
+    "Verbosity": {
+      "description": "Controls output length/detail on GPT-5 models via the Responses API. Serialized with lowercase values to match the OpenAI API.",
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ]
+    },
+    "WebSearchToolType": {
+      "type": "string",
+      "enum": [
+        "text",
+        "text_and_image"
+      ]
+    }
+  },
+  "$id": "https://mimo2codex.dev/schemas/codex-catalog.schema.json"
+}
